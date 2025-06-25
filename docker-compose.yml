@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  stat_arb_app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ENV_FILE=.env
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7.0
+    ports:
+      - "6379:6379"
