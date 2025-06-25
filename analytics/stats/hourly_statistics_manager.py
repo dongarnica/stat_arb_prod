@@ -16,6 +16,8 @@ from .configuration_manager import ConfigurationManager
 from .database_manager import DatabaseManager
 from .data_manager import DataManager
 from .cointegration_manager import CointegrationManager
+from .metrics import compute_hourly_statistics
+from .metrics import compute_hourly_statistics
 
 
 class HourlyStatisticsManager:
@@ -400,6 +402,35 @@ class HourlyStatisticsManager:
             spread_momentum = self._calculate_momentum(spread)
             correlation = prices1_aligned.corr(prices2_aligned)
             
+            # Calculate advanced metrics using the new metrics module
+            try:
+                # Create Z-score series for the analysis window
+                if spread_std > 0:
+                    zscore_series = (spread_window - spread_mean) / spread_std
+                else:
+                    zscore_series = pd.Series(
+                        [0.0] * len(spread_window),
+                        index=spread_window.index
+                    )
+                
+                # Compute advanced hourly statistics
+                advanced_metrics = compute_hourly_statistics(
+                    spread_window, zscore_series
+                )
+                
+            except Exception as e:
+                self.logger.warning(
+                    f"Failed to compute advanced metrics for "
+                    f"{symbol1}-{symbol2}: {e}"
+                )
+                # Set default values if calculation fails
+                advanced_metrics = {
+                    'half_life': None,
+                    'sharpe_ratio': 0.0,
+                    'zscore_over_2': 0,
+                    'zscore_under_minus_2': 0
+                }
+            
             # Create result
             result = {
                 'symbol1': symbol1,
@@ -417,6 +448,13 @@ class HourlyStatisticsManager:
                 'signal_strength': float(signal_info['strength']),
                 'has_signal': bool(signal_info['has_signal']),
                 'analysis_timestamp': datetime.now(),
+                # Add new advanced metrics
+                'half_life': advanced_metrics['half_life'],
+                'sharpe_ratio': float(advanced_metrics['sharpe_ratio']),
+                'zscore_over_2': int(advanced_metrics['zscore_over_2']),
+                'zscore_under_minus_2': int(
+                    advanced_metrics['zscore_under_minus_2']
+                ),
                 'metadata': {
                     'spread_volatility': float(spread_volatility),
                     'spread_momentum': float(spread_momentum),
@@ -516,7 +554,8 @@ class HourlyStatisticsManager:
                     hedge_ratio, spread_value, current_z_score,
                     spread_mean, spread_std, ma_short, ma_long,
                     signal_type, signal_strength, has_signal,
-                    analysis_timestamp, metadata
+                    analysis_timestamp, half_life, sharpe_ratio,
+                    zscore_over_2, zscore_under_minus_2, metadata
                 ) VALUES %s
             """
             
@@ -538,6 +577,10 @@ class HourlyStatisticsManager:
                     result['signal_strength'],
                     result['has_signal'],
                     result['analysis_timestamp'],
+                    result['half_life'],
+                    result['sharpe_ratio'],
+                    result['zscore_over_2'],
+                    result['zscore_under_minus_2'],
                     json.dumps(result['metadata'])
                 ))
             
@@ -583,17 +626,31 @@ class HourlyStatisticsManager:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
-                CREATE INDEX IF NOT EXISTS idx_hourly_stats_timestamp 
+                CREATE INDEX IF NOT EXISTS idx_hourly_stats_timestamp
                 ON hourly_statistics(analysis_timestamp);
                 
-                CREATE INDEX IF NOT EXISTS idx_hourly_stats_symbols 
+                CREATE INDEX IF NOT EXISTS idx_hourly_stats_symbols
                 ON hourly_statistics(symbol1, symbol2);
                 
-                CREATE INDEX IF NOT EXISTS idx_hourly_stats_signals 
+                CREATE INDEX IF NOT EXISTS idx_hourly_stats_signals
                 ON hourly_statistics(has_signal, analysis_timestamp);
                 
-                CREATE INDEX IF NOT EXISTS idx_hourly_stats_zscore 
+                CREATE INDEX IF NOT EXISTS idx_hourly_stats_zscore
                 ON hourly_statistics(ABS(current_z_score));
+                
+                -- Add new metrics columns if they don't exist
+                ALTER TABLE hourly_statistics
+                ADD COLUMN IF NOT EXISTS half_life DOUBLE PRECISION;
+                
+                ALTER TABLE hourly_statistics
+                ADD COLUMN IF NOT EXISTS sharpe_ratio DOUBLE PRECISION;
+                
+                ALTER TABLE hourly_statistics
+                ADD COLUMN IF NOT EXISTS zscore_over_2 INTEGER DEFAULT 0;
+                
+                ALTER TABLE hourly_statistics
+                ADD COLUMN IF NOT EXISTS zscore_under_minus_2 INTEGER
+                DEFAULT 0;
             """
             
             with connection.cursor() as cursor:
