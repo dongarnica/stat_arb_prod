@@ -283,6 +283,12 @@ class DataManager:
             # Rename columns to standard format
             df.columns = ['open', 'high', 'low', 'close', 'volume']
             
+            # Convert Decimal columns to float for mathematical operations
+            numeric_columns = ['open', 'high', 'low', 'close', 'volume']
+            for col in numeric_columns:
+                if col in df.columns:
+                    df[col] = df[col].astype(float)
+            
             return df
             
         except Exception as e:

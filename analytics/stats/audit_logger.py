@@ -95,6 +95,34 @@ class AuditLogger:
         
         self._write_audit_entry(audit_entry)
     
+    def log_event(self, event_type: str, data: Dict[str, Any]) -> None:
+        """
+        Log an audit event.
+        
+        Parameters:
+        -----------
+        event_type : str
+            Type of the event
+        data : Dict[str, Any]
+            Event data
+        """
+        try:
+            event = {
+                'timestamp': datetime.now().isoformat(),
+                'event_type': event_type,
+                'level': 'INFO',
+                'data': data
+            }
+            
+            with self._lock:
+                self.audit_history.append(event)
+            
+            # Log to file
+            self.audit_file_logger.info(json.dumps(event))
+            
+        except Exception as e:
+            self.logger.error(f"Failed to log event {event_type}: {e}")
+    
     def log_error(self, symbol: str, pair_symbol: Optional[str],
                   error_message: str, operation: str = 'calculation') -> None:
         """
@@ -123,30 +151,67 @@ class AuditLogger:
         
         self._write_audit_entry(audit_entry)
     
-    def log_system_event(self, event_type: str, event_data: Dict[str, Any],
-                         status: str = 'info') -> None:
+    def log_system_event(self, event_type: str, data: Dict[str, Any]) -> None:
         """
-        Log a system-level event.
+        Log a system audit event.
         
         Parameters:
         -----------
         event_type : str
-            Type of system event
-        event_data : Dict[str, Any]
-            Event details
-        status : str
-            Event status (info, warning, error)
+            Type of the event
+        data : Dict[str, Any]
+            Event data
         """
-        audit_entry = {
-            'timestamp': datetime.now().isoformat(),
-            'operation': 'system_event',
-            'event_type': event_type,
-            'status': status,
-            'event_data': event_data
-        }
-        
-        self._write_audit_entry(audit_entry)
+        try:
+            event = {
+                'timestamp': datetime.now().isoformat(),
+                'event_type': event_type,
+                'level': 'INFO',
+                'data': data
+            }
+            
+            with self._lock:
+                self.audit_history.append(event)
+            
+            # Log to file
+            self.audit_file_logger.info(json.dumps(event))
+            
+        except Exception as e:
+            self.logger.error(f"Failed to log system event {event_type}: {e}")
     
+    def log_system_error(self, error_type: str, error_data: Any) -> None:
+        """
+        Log a system error event.
+        
+        Parameters:
+        -----------
+        error_type : str
+            Type of the error
+        error_data : Any
+            Error data (can be string, dict, etc.)
+        """
+        try:
+            if isinstance(error_data, str):
+                data = {'error': error_data}
+            else:
+                data = error_data if isinstance(error_data, dict) else {'error': str(error_data)}
+            
+            event = {
+                'timestamp': datetime.now().isoformat(),
+                'event_type': error_type,
+                'level': 'ERROR',
+                'data': data
+            }
+            
+            with self._lock:
+                self.audit_history.append(event)
+            
+            # Log to file
+            self.audit_file_logger.error(json.dumps(event))
+            
+        except Exception as e:
+            self.logger.error(f"Failed to log system error {error_type}: {e}")
+
     def log_database_operation(self, operation: str, table: str,
                                records_affected: int,
                                success: bool) -> None:

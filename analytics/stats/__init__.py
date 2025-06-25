@@ -3,7 +3,7 @@ Statistics System Package.
 
 This package provides a comprehensive statistics calculation system for
 financial data analysis, with support for both single-asset and pair
-trading statistics.
+trading statistics, including cointegration analysis and hourly monitoring.
 """
 
 from .base_statistic import BaseStatistic
@@ -14,6 +14,9 @@ from .performance_monitor import PerformanceMonitor
 from .audit_logger import AuditLogger
 from .data_manager import DataManager
 from .orchestrator import StatisticsOrchestrator
+from .cointegration_manager import CointegrationManager
+from .hourly_statistics_manager import HourlyStatisticsManager
+from .scheduler import StatisticalArbitrageScheduler
 
 __all__ = [
     'BaseStatistic',
@@ -23,7 +26,10 @@ __all__ = [
     'ResultValidator',
     'PerformanceMonitor',
     'AuditLogger',
-    'DataManager'
+    'DataManager',
+    'CointegrationManager',
+    'HourlyStatisticsManager',
+    'StatisticalArbitrageScheduler'
 ]
 
-__version__ = '1.0.0'
+__version__ = '1.1.0'
